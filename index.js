@@ -14,7 +14,7 @@ app.disable("x-powered-by");
 app.set("trust proxy", true);
 connectDB();
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.send("Url shortner(shortenX) backend server is running");
 });
 app.use("/api", mainRoute);
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
