@@ -7,11 +7,23 @@ const PORT = 5000 || process.env.PORT;
 app.use(express.json());
 app.use(
   cors({
-    origin: "*",
-    origin: "https://shortenx.netlify.app",
-    credentials: true,
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        "http://localhost:3000", // Development origin
+        "https://shortenx.netlify.app", // Production origin
+      ];
+       
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    credentials: true, 
   })
 );
+
 app.disable("x-powered-by");
 app.set("trust proxy", true);
 connectDB();
