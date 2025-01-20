@@ -27,13 +27,35 @@ export const deleteAllUrls = async (req, res) => {
 };
 export const getAllUrls = async (req, res) => {
   try {
-    const urls = await URL.find({});
-    res.status(200).json({ success: true, urls });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 15;
+    const searchQuery = req.query.search || "";
+
+    const searchFilter = searchQuery
+      ? {
+          $or: [
+            { name: { $regex: searchQuery, $options: "i" } },
+            { url: { $regex: searchQuery, $options: "i" } },
+            { shortUrl: { $regex: searchQuery, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const perPage = limit;
+    const totalUrls = await URL.countDocuments(searchFilter);
+    const totalPages = Math.ceil(totalUrls / perPage);
+
+    const urls = await URL.find(searchFilter)
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .sort({ createdAt: 1 });
+    res.status(200).json({ success: true, urls, totalPages, page });
   } catch (error) {
     console.error("Error fetching URLs:", error.message);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
 export const getUrl = async (req, res) => {
   try {
     const { shortUrlId } = req.params;
@@ -74,28 +96,57 @@ export const getUrl = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-export const getUrlByEmail= async (req, res) => {
-  const { email } = req.params;
-  try {
-    console.log("Email:", email);
-    if (!email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide a valid email" });
+export const getUrlByEmail = async (req, res) => {
+    try {
+        const { email } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = 5;
+        const perPage = limit;
+        const searchQuery = req.query.search || "";
+
+        if (!email) {
+            return res
+                .status(400)
+                .json({ success: false, message: "Please provide a valid email" });
+        }
+
+        // Apply email filter along with search criteria
+        const searchFilter = {
+            email, // Ensure results are filtered by email
+            ...(searchQuery
+                ? {
+                    $or: [
+                        { name: { $regex: searchQuery, $options: "i" } },
+                        { url: { $regex: searchQuery, $options: "i" } },
+                        { shortUrl: { $regex: searchQuery, $options: "i" } },
+                    ],
+                }
+                : {}),
+        };
+
+        // Get total number of matching URLs for pagination
+        const totalUrls = await URL.countDocuments(searchFilter);
+        const totalPages = Math.ceil(totalUrls / perPage);
+
+        // Fetch paginated URLs
+        const urls = await URL.find(searchFilter)
+            .skip((page - 1) * perPage)
+            .limit(perPage)
+            .sort({ createdAt: -1 });
+
+        if (urls.length === 0) {
+            return res
+                .status(404)
+                .json({ success: false, message: "No data found" });
+        }
+
+        res.status(200).json({ success: true, urlData: urls, totalPages, page });
+    } catch (error) {
+        console.error("Error fetching URLs:", error.message);
+        res.status(500).json({ success: false, message: "Internal server error" });
     }
-    const urlData = await URL.find({ email});
-    if (!urlData) {
-      return res.status(404).json({ success: false, message: "Data not found" });
-    }
-    if(urlData.length === 0) {
-      return res.status(404).json({ success: false, message: "Data not found might be not available" });
-    }
-    res.status(200).json({ success: true, urlData });
-  } catch (error) {
-    // console.error("Error fetching URL:", error.message);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
 };
+
 export const generateUrl = async (req, res) => {
   const { encodedUrl, customUrl, email, name } = req.body;
   // console.log("Encoded URL:", encodedUrl);
